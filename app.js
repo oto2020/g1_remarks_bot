@@ -88,7 +88,6 @@ const getRoomByCallbackData = (callbackData) => {
 // Function to send all messages of a room to the user
 const sendMessagesForRoom = async (chatId, callbackData) => {
     let room = getRoomByCallbackData(callbackData);
-    let destination = `📍${room.departmentTitle} "${room.roomName}"`;
     const messages = await getMessagesForRoom(callbackData);
 
     let firstTimestamp = null;
@@ -98,7 +97,7 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
         firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         console.log(firstTimestamp, lastTimestamp);
-        await bot.sendMessage(chatId, `🤖 Ранее вы писали\n${destination} `);
+        await bot.sendMessage(chatId, `🤖 Ранее вы писали:`);
     } else {
         // await bot.sendMessage(chatId, `🤖 Сообщения по помещению ${room.departmentTitle} "${room.roomName}" отсутствуют. Пожалуйста, сделайте фото и оставьте комментарий.`);
     }
@@ -109,7 +108,7 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
 
     for (let i = 0; i < messages.length; i++) {
         let message = messages[i];
-
+        let messageText = '👤 ' + message.text;
         if (message.type === 'text') {
             if (lastTextMessage !== null) {
                 await bot.sendMessage(chatId, lastTextMessage);
@@ -121,7 +120,7 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
                 photoGroup = [];
                 currentCaption = '';
             }
-            lastTextMessage = `${message.content}`;
+            lastTextMessage = `${messageText}`;
         }
 
         if (message.type === 'photo') {
@@ -131,7 +130,7 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
                 currentCaption = '';
             }
             if (photoGroup.length === 0) {
-                currentCaption = message.text ? `${message.text}` : '';
+                currentCaption = message.text ? `${messageText}` : '';
                 photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
             } else {
                 photoGroup.push({ type: 'photo', media: message.content });
@@ -145,9 +144,6 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
     if (photoGroup.length > 0) {
         await bot.sendMediaGroup(chatId, photoGroup);
     }
-
-    const count = await getMessageCountForRoom(callbackData);
-    await bot.sendMessage(chatId, `🤖 Вы можете дополнить ${count} замечаний, пишите мне в ответ, подкрепляя фотографиями!`);
 };
 
 
@@ -166,20 +162,18 @@ bot.on('message', async (msg) => {
         console.log(callbackData);
 
         if (msg.text) {
-            if (callbackData && callbackData !== 'none') {
-                await saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, msg.text, 'text', msg.text);
-                const count = await getMessageCountForRoom(callbackData);
-                let room = getRoomByCallbackData(callbackData);
-                // console.log(room);
-                bot.sendMessage(msg.chat.id, `Спасибо!\nСообщения дополнены (${count})`, backButtonForDepartmentKey(room.departmentKey));
-            } else {
-                bot.sendMessage(msg.chat.id, 'Ваше сообщение не будет сохранено, выберите сначала помещение');
-            }
+            await saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, msg.text, 'text', msg.text);
         } else if (msg.photo) {
             const fileId = msg.photo[msg.photo.length - 1].file_id;
             const caption = msg.caption || null; // Получаем подпись к фото, если она есть
-            await saveMessage(msg.from.id.toString(), msg.chat.id, currentRoom, fileId, 'photo', caption);
+            await saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, fileId, 'photo', caption);
         }
+
+        
+        const count = await getMessageCountForRoom(callbackData);
+        let room = getRoomByCallbackData(callbackData);
+        // console.log(room);
+        bot.sendMessage(msg.chat.id, `🤖 Спасибо!\nСообщения (${count}) дополнены.\nВы можете продолжить в этом чате или перейти к следующей комнате.`, backButtonForDepartmentKey(room.departmentKey));
     }
 });
 
@@ -199,7 +193,7 @@ bot.on('callback_query', async (callbackQuery) => {
         for (const department in rooms) {
             const room = rooms[department].rooms.find(r => r.callback_data === data);
             if (room) {
-                let destination = `📍${rooms[department].title}: ${room.name}`;
+                let destination = `📍 ${rooms[department].title}\n➡️ ${room.name}`;
                 // Обновляем комнату пользователя
                 await updateUserRoom(callbackQuery.from.id.toString(), data);
 
@@ -207,12 +201,13 @@ bot.on('callback_query', async (callbackQuery) => {
                 await sendMessagesForRoom(msg.chat.id, data);
 
                 // Описываем криетрии и кнопка "Назад"
-                const messageText = `${room.intermediate_message}\n\n${destination}`;
+                const count = await getMessageCountForRoom(data);
+                const messageText = `🤖 Вы можете дополнить ${count} замечаний, пишите мне в ответ, подкрепляя фотографиями!\n\n${room.intermediate_message}\n\n${destination}`;
                 bot.sendMessage(msg.chat.id, messageText, backButtonForDepartmentKey(department));
                 found = true;
                 break;
             } else if (data === `back_to_${department}`) {
-                bot.sendMessage(msg.chat.id, `Вы вернулись к отделу: ${rooms[department].title}`, await generateRoomMenu(department));
+                bot.sendMessage(msg.chat.id, `Вы вернулись к отделу: \n📍${rooms[department].title}`, await generateRoomMenu(department));
                 await updateUserRoom(callbackQuery.from.id.toString(), 'none');
                 found = true;
                 break;
