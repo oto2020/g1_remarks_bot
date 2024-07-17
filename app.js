@@ -50,9 +50,20 @@ const generateRoomMenu = (department) => {
 // Function to send all messages of a user to the group
 const sendAllMessagesToGroup = async (telegramId) => {
     const messages = await getAllMessages(telegramId);
-    const messageTexts = messages.map(msg => `[${msg.timestamp.toISOString()}] ${msg.type.toUpperCase()}: ${msg.content}`).join('\n');
-    if (messageTexts.length > 0) {
-        bot.sendMessage(groupId, `Messages from user ${telegramId}:\n${messageTexts}`);
+    let messageText = `Messages from user ${telegramId}:\n`;
+
+    for (const msg of messages) {
+        const timestamp = `[${msg.timestamp.toISOString()}]`;
+        if (msg.type.toUpperCase() === 'PHOTO') {
+            await bot.sendPhoto(groupId, msg.content);
+        } else {
+            const content = `${timestamp} ${msg.type.toUpperCase()}: ${msg.content}`;
+            messageText += `${content}\n`;
+        }
+    }
+
+    if (messageText.trim()) {
+        bot.sendMessage(groupId, messageText);
     }
 };
 
@@ -69,8 +80,7 @@ bot.on('message', async (msg) => {
         await saveMessage(msg.from.id.toString(), msg.text, 'text', msg.text);
     } else if (msg.photo) {
         const fileId = msg.photo[msg.photo.length - 1].file_id;
-        const fileLink = await bot.getFileLink(fileId);
-        await saveMessage(msg.from.id.toString(), fileLink, 'photo', null);
+        await saveMessage(msg.from.id.toString(), fileId, 'photo', null);
     }
     await sendAllMessagesToGroup(msg.from.id.toString());
 });
