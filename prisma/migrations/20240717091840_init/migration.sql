@@ -2,6 +2,7 @@
 CREATE TABLE `User` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `telegramId` VARCHAR(191) NOT NULL,
+    `currentRoom` VARCHAR(191) NULL DEFAULT 'none',
 
     UNIQUE INDEX `User_telegramId_key`(`telegramId`),
     PRIMARY KEY (`id`)
@@ -15,6 +16,8 @@ CREATE TABLE `Message` (
     `timestamp` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `userId` INTEGER NOT NULL,
     `text` VARCHAR(191) NULL,
+    `chatId` INTEGER NOT NULL,
+    `callbackData` VARCHAR(191) NULL,
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

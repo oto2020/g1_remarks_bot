@@ -8,18 +8,24 @@ generator client {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  telegramId String   @unique
-  messages  Message[]
+  id           Int      @id @default(autoincrement())
+  telegramId   String   @unique
+  messages     Message[]
+  currentRoom  String?  @default("none") // Поле для хранения текущего помещения
 }
 
 model Message {
-  id        Int      @id @default(autoincrement())
-  content   String
-  type      String
-  timestamp DateTime @default(now())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  text      String?  // Добавлено новое поле
+  id           Int      @id @default(autoincrement())
+  content      String
+  type         String
+  timestamp    DateTime @default(now())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  text         String?
+  chatId       Int      // Поле для хранения chatId
+  callbackData String?  // Поле для хранения callback_data
 }
+
+
+
   

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
-const { saveMessage, getAllMessages } = require('./controllers/dbController');
+const { saveMessage, getAllMessages, updateUserRoom, getCurrentRoom } = require('./controllers/dbController');
 
 const token = process.env.TOKEN;
 const bot = new TelegramBot(token, { polling: true });
@@ -47,42 +47,26 @@ const generateRoomMenu = (department) => {
     };
 };
 
-// Function to send all messages of a user to the group
-const sendAllMessagesToGroup = async (telegramId) => {
-    const messages = await getAllMessages(telegramId);
-    let messageText = `Messages from user ${telegramId}:\n`;
-
-    for (const msg of messages) {
-        const timestamp = `[${msg.timestamp.toISOString()}]`;
-        if (msg.type.toUpperCase() === 'PHOTO') {
-            await bot.sendPhoto(groupId, msg.content);
-        } else {
-            const content = `${timestamp} ${msg.type.toUpperCase()}: ${msg.content}`;
-            messageText += `${content}\n`;
-        }
-    }
-
-    if (messageText.trim()) {
-        bot.sendMessage(groupId, messageText);
-    }
-};
-
 // Start command
 bot.onText(/\/start/, async (msg) => {
-    await saveMessage(msg.from.id.toString(), msg.text, 'text', msg.text);
+    await saveMessage(msg.from.id.toString(), msg.chat.id, null, msg.text, 'text', msg.text);
     bot.sendMessage(msg.chat.id, 'Выберите отдел:', generateMainMenu());
-    await sendAllMessagesToGroup(msg.from.id.toString());
 });
 
 // Message handler
 bot.on('message', async (msg) => {
+    const currentRoom = await getCurrentRoom(msg.from.id.toString());
+
     if (msg.text) {
-        await saveMessage(msg.from.id.toString(), msg.text, 'text', msg.text);
+        if (currentRoom && currentRoom !== 'none') {
+            await saveMessage(msg.from.id.toString(), msg.chat.id, currentRoom, msg.text, 'text', msg.text);
+        } else {
+            bot.sendMessage(msg.chat.id, 'Ваше сообщение не будет сохранено, выберите сначала помещение');
+        }
     } else if (msg.photo) {
         const fileId = msg.photo[msg.photo.length - 1].file_id;
-        await saveMessage(msg.from.id.toString(), fileId, 'photo', null);
+        await saveMessage(msg.from.id.toString(), msg.chat.id, currentRoom, fileId, 'photo', null);
     }
-    await sendAllMessagesToGroup(msg.from.id.toString());
 });
 
 // Callback query handler
@@ -90,23 +74,26 @@ bot.on('callback_query', async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
 
-    await saveMessage(callbackQuery.from.id.toString(), data, 'callback', data);
-    await sendAllMessagesToGroup(callbackQuery.from.id.toString());
-
     if (data === 'back_to_departments') {
         bot.sendMessage(msg.chat.id, 'Выберите отдел:', generateMainMenu());
+        await updateUserRoom(callbackQuery.from.id.toString(), 'none');
     } else if (rooms[data]) {
-        bot.sendMessage(msg.chat.id, `Вы выбрали: ${rooms[data].title}`, generateRoomMenu(data));
+        bot.sendMessage(msg.chat.id, `Выберите подразделение:`, generateRoomMenu(data));
+        await updateUserRoom(callbackQuery.from.id.toString(), 'none');
     } else {
         let found = false;
         for (const department in rooms) {
             const room = rooms[department].rooms.find(r => r.callback_data === data);
             if (room) {
-                bot.sendMessage(msg.chat.id, room.intermediate_message, backButton(department));
+                const messageText = `📍${rooms[department].title}\n📍${room.name}\n\n${room.intermediate_message}`;
+                bot.sendMessage(msg.chat.id, messageText, backButton(department));
+                // await saveMessage(callbackQuery.from.id.toString(), msg.chat.id, data, messageText, 'callback', data);
+                await updateUserRoom(callbackQuery.from.id.toString(), data);
                 found = true;
                 break;
             } else if (data === `back_to_${department}`) {
                 bot.sendMessage(msg.chat.id, `Вы вернулись к отделу: ${rooms[department].title}`, generateRoomMenu(department));
+                await updateUserRoom(callbackQuery.from.id.toString(), 'none');
                 found = true;
                 break;
             }
