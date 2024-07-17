@@ -11,11 +11,29 @@ const groupId = '-4263608042'; // Идентификатор группы
 // Load rooms data
 const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
+
+// Function to count messages for a department and check if all rooms have comments
+const getMessageCountForDepartment = async (departmentKey) => {
+    const department = rooms[departmentKey];
+    let totalMessages = 0;
+    let roomsWithComments = 0;
+
+    for (const room of department.rooms) {
+        const count = await getMessageCountForRoom(room.callback_data);
+        totalMessages += count;
+        if (count > 0) {
+            roomsWithComments += 1;
+        }
+    }
+
+    return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
+};
+
 // Function to generate main menu
 const generateMainMenu = async () => {
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
-        const count = await getMessageCountForRoom(key);
-        return [{ text: `${rooms[key].title} (${count})`, callback_data: key }];
+        const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
+        return [{ text: `${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
     }));
     return {
         reply_markup: {
@@ -77,8 +95,8 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
     let lastTimestamp = null;
 
     if (messages.length > 0) {
-        // firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
-        // lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
+        firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
+        lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         console.log(firstTimestamp, lastTimestamp);
         await bot.sendMessage(chatId, `🤖 Ранее вы писали\n${destination} `);
     } else {
@@ -95,6 +113,7 @@ const sendMessagesForRoom = async (chatId, callbackData) => {
         if (message.type === 'text') {
             if (lastTextMessage !== null) {
                 await bot.sendMessage(chatId, lastTextMessage);
+
                 lastTextMessage = null;
             }
             if (photoGroup.length > 0) {
@@ -151,7 +170,7 @@ bot.on('message', async (msg) => {
                 await saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, msg.text, 'text', msg.text);
                 const count = await getMessageCountForRoom(callbackData);
                 let room = getRoomByCallbackData(callbackData);
-                console.log(room);
+                // console.log(room);
                 bot.sendMessage(msg.chat.id, `Спасибо!\nСообщения дополнены (${count})`, backButtonForDepartmentKey(room.departmentKey));
             } else {
                 bot.sendMessage(msg.chat.id, 'Ваше сообщение не будет сохранено, выберите сначала помещение');
