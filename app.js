@@ -33,7 +33,8 @@ const getMessageCountForDepartment = async (departmentKey) => {
 const generateMainMenu = async () => {
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
         const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
-        return [{ text: `${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
+        let check = roomsWithComments == totalRooms;
+        return [{ text: `${check?'✅':''} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
     }));
     return {
         reply_markup: {
