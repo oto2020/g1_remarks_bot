@@ -27,15 +27,10 @@ async function saveMessage(telegramId, chatId, callbackData, content, type, text
 
 // Update current room for user
 async function updateUserRoom(telegramId, currentRoom) {
-    console.log(telegramId, currentRoom);
-    try {
-        return await prisma.user.update({
-            where: { telegramId },
-            data: { currentRoom },
-        });
-    } catch (e) {
-        console.log('error\n')
-    }
+    return await prisma.user.update({
+        where: { telegramId },
+        data: { currentRoom },
+    });
 }
 
 // Get current room for user
@@ -53,10 +48,27 @@ async function getAllMessages(telegramId) {
     });
 }
 
+// Get count of messages for a room
+async function getMessageCountForRoom(callbackData) {
+    return await prisma.message.count({
+        where: { callbackData }
+    });
+}
+
+// Get all messages for a room
+async function getMessagesForRoom(callbackData) {
+    return await prisma.message.findMany({
+        where: { callbackData },
+        orderBy: { timestamp: 'asc' }
+    });
+}
+
 module.exports = {
     getUser,
     saveMessage,
     updateUserRoom,
     getCurrentRoom,
-    getAllMessages
+    getAllMessages,
+    getMessageCountForRoom,
+    getMessagesForRoom
 };
