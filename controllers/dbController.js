@@ -34,7 +34,7 @@ async function updateUserRoom(telegramId, currentRoom) {
 }
 
 // Get current room for user
-async function getCurrentRoom(telegramId) {
+async function getCallbackData(telegramId) {
     const user = await getUser(telegramId);
     return user.currentRoom;
 }
@@ -67,7 +67,7 @@ module.exports = {
     getUser,
     saveMessage,
     updateUserRoom,
-    getCurrentRoom,
+    getCallbackData,
     getAllMessages,
     getMessageCountForRoom,
     getMessagesForRoom
