@@ -3,11 +3,15 @@ const prisma = new PrismaClient();
 
 // Create or get user by Telegram ID
 async function getUser(telegramId) {
-    return await prisma.user.upsert({
-        where: { telegramId },
-        update: {},
-        create: { telegramId },
+    let user = await prisma.user.findUnique({
+        where: { telegramId }
     });
+    if (!user) {
+        user = await prisma.user.create({
+            data: { telegramId }
+        });
+    }
+    return user;
 }
 
 // Save message
@@ -27,7 +31,6 @@ async function saveMessage(telegramId, chatId, callbackData, content, type, text
 
 // Update current room for user
 async function updateUserRoom(telegramId, currentRoom) {
-    
     if (!telegramId || !currentRoom) {
         console.log('ошибка, связанная с ', telegramId, currentRoom);
         return;
