@@ -33,8 +33,10 @@ const getMessageCountForDepartment = async (departmentKey) => {
 const generateMainMenu = async () => {
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
         const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
-        let check = roomsWithComments == totalRooms;
-        return [{ text: `${check?'✅':''} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
+        let check = '';
+        if (roomsWithComments == totalRooms) check = '✅';
+        else if (roomsWithComments > 0 ) check = '☑️';
+        return [{ text: `${check} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
     }));
     return {
         reply_markup: {
@@ -160,6 +162,10 @@ bot.onText(/\/start/, async (msg) => {
 bot.on('message', async (msg) => {
     if (msg.from.id !== bot.id) {
         const callbackData = await getCallbackData(msg.from.id.toString());
+        if (callbackData == 'none') {
+            bot.sendMessage(msg.chat.id, 'Выберите отдел:', await generateMainMenu());
+            return;
+        }
         console.log(callbackData);
 
         if (msg.text) {
@@ -174,6 +180,7 @@ bot.on('message', async (msg) => {
         const count = await getMessageCountForRoom(callbackData);
         let room = getRoomByCallbackData(callbackData);
         // console.log(room);
+        if (!room) return;
         bot.sendMessage(msg.chat.id, `🤖 Спасибо!\nСообщения (${count}) дополнены.\nВы можете продолжить в этом чате или перейти к следующей комнате.`, backButtonForDepartmentKey(room.departmentKey));
     }
 });
