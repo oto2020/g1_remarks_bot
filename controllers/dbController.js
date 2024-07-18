@@ -59,7 +59,7 @@ async function getAllMessages(telegramId) {
 // Get count of messages for a room
 async function getMessageCountForRoom(callbackData) {
     return await prisma.message.count({
-        where: { callbackData }
+        where: { callbackData}
     });
 }
 
@@ -71,6 +71,29 @@ async function getMessagesForRoom(callbackData) {
     });
 }
 
+
+// Save room status message
+async function saveRoomStatus(telegramId, callbackData, status) {
+    const user = await getUser(telegramId);
+    return await prisma.message.create({
+        data: {
+            content: status,
+            type: 'status',
+            userId: user.id,
+            callbackData,
+            chatId: user.id, // Assuming the chatId is the same as user ID for status messages
+        }
+    });
+}
+
+// Get room status
+async function getRoomStatus(callbackData) {
+    const statusMessage = await prisma.message.findFirst({
+        where: { callbackData, type: 'status' },
+        orderBy: { timestamp: 'desc' }
+    });
+    return statusMessage ? statusMessage.content : 'pending';
+}
 module.exports = {
     getUser,
     saveMessage,
@@ -78,5 +101,7 @@ module.exports = {
     getCallbackData,
     getAllMessages,
     getMessageCountForRoom,
-    getMessagesForRoom
+    getMessagesForRoom,
+    saveRoomStatus,
+    getRoomStatus
 };
