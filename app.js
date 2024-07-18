@@ -11,7 +11,7 @@ const groupId = '-4263608042'; // Идентификатор группы
 // Load rooms data
 const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
-const StATUS_GOOD = '👍';       // 100%
+const STATUS_GOOD = '👍';       // 100%
 const STATUS_PENDING = '🧐';    //
 const STATUS_FULL = '✅';       // check
 const STATUS_PARTLY = '☑️';     // check
@@ -64,7 +64,7 @@ const generateRoomMenu = async (department) => {
         }
         let appendText = '';
         if (status === 'good') {
-            appendText = '(' + count + ') ' + StATUS_GOOD 
+            appendText = '(' + count + ') ' + STATUS_GOOD 
         } else if (count == 0) {
             appendText =  '(' + count + ') ' + '✖️';
         } else {
@@ -220,7 +220,7 @@ bot.on('callback_query', async (callbackQuery) => {
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'good');
         const count = await db.getMessageCountForRoom(roomCallbackData);
         let room = getRoomByCallbackData(roomCallbackData);
-        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${StATUS_GOOD} \nЗамечания (${count}) переданы не будут!`, backButtonForDepartmentKey(room.departmentKey));
+        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${STATUS_GOOD} \nЗамечания (${count}) переданы не будут!`, backButtonForDepartmentKey(room.departmentKey));
         return;
     }
 
@@ -255,7 +255,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 }
                 let messageText = `🤖 Вы можете дополнить ${count} замечаний, пишите мне в ответ, подкрепляя фотографиями!\n\n${room.intermediate_message}\n\n${destination}`;
                 if (status === 'good') {
-                    messageText = `🤖 Замечания (${count}) переданы не будут ${StATUS_GOOD} \n\n ${destination}`;
+                    messageText = `🤖 Замечания (${count}) переданы не будут ${STATUS_GOOD} \n\n ${destination}`;
                 }
                 
                 const inline_keyboard = [
@@ -265,7 +265,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 if (status === 'good') {
                     inline_keyboard.unshift([{ text: `${STATUS_PENDING} Открыть замечания ${STATUS_PENDING}`, callback_data: `open_comments_${data}` }]);
                 } else {
-                    inline_keyboard.unshift([{ text: `${StATUS_GOOD} Отметить как всё в порядке ${StATUS_GOOD}`, callback_data: `mark_good_${data}` }]);
+                    inline_keyboard.unshift([{ text: `${STATUS_GOOD} Отметить как всё в порядке ${STATUS_GOOD}`, callback_data: `mark_good_${data}` }]);
                 }
 
                 bot.sendMessage(msg.chat.id, messageText, {
