@@ -58,10 +58,41 @@ async function getAllMessages(telegramId) {
 
 // Get count of messages for a room
 async function getMessageCountForRoom(callbackData) {
-    return await prisma.message.count({
-        where: { callbackData}
-    });
+    try {
+        const count = await prisma.message.count({
+            where: {
+                callbackData: callbackData,
+                type: {
+                    not: 'status'
+                }
+            }
+        });
+        return count;
+    } catch (error) {
+        console.error("Error getting message count for room:", error);
+        throw error; // Проброс ошибки для дальнейшей обработки, если необходимо
+    }
 }
+
+// Get count of messages for a room
+async function getMessageStatusGoodCountForRoom(callbackData) {
+    try {
+        const count = await prisma.message.count({
+            where: {
+                callbackData: callbackData,
+                type: 'status',
+                content: 'good'
+            }
+        });
+        return count;
+    } catch (error) {
+        console.error("Error getting message satus good count for room:", error);
+        throw error; // Проброс ошибки для дальнейшей обработки, если необходимо
+    }
+}
+
+
+
 
 // Get all messages for a room
 async function getMessagesForRoom(callbackData) {
@@ -74,6 +105,13 @@ async function getMessagesForRoom(callbackData) {
 
 // Save room status message
 async function saveRoomStatus(telegramId, callbackData, status) {
+    await prisma.message.deleteMany({
+        where: { 
+            callbackData: callbackData,
+            type: 'status'
+         }
+    });
+
     const user = await getUser(telegramId);
     return await prisma.message.create({
         data: {
@@ -101,6 +139,7 @@ module.exports = {
     getCallbackData,
     getAllMessages,
     getMessageCountForRoom,
+    getMessageStatusGoodCountForRoom,
     getMessagesForRoom,
     saveRoomStatus,
     getRoomStatus
