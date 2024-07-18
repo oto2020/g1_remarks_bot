@@ -11,7 +11,7 @@ const groupId = '-4263608042'; // Идентификатор группы
 // Load rooms data
 const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
-const StATUS_GOOD = '💯';       // 100%
+const StATUS_GOOD = '👍';       // 100%
 const STATUS_PENDING = '🧐';    //
 const STATUS_FULL = '✅';       // check
 const STATUS_PARTLY = '☑️';     // check
@@ -64,9 +64,11 @@ const generateRoomMenu = async (department) => {
         }
         let appendText = '';
         if (status === 'good') {
-            appendText = StATUS_GOOD 
+            appendText = '(' + count + ') ' + StATUS_GOOD 
+        } else if (count == 0) {
+            appendText =  '(' + count + ') ' + '✖️';
         } else {
-            appendText = STATUS_PENDING + ' (' + count + ')';
+            appendText =  '(' + count + ') ' + STATUS_PENDING;
         }
         return [{ text: `${room.name} ${appendText}`, callback_data: room.callback_data }];
     }));
@@ -216,8 +218,9 @@ bot.on('callback_query', async (callbackQuery) => {
     if (data.startsWith('mark_good_')) {
         const roomCallbackData = data.replace('mark_good_', '');
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'good');
+        const count = await db.getMessageCountForRoom(roomCallbackData);
         let room = getRoomByCallbackData(roomCallbackData);
-        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке. Замечания переданы не будут ${StATUS_GOOD} !`, backButtonForDepartmentKey(room.departmentKey));
+        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${StATUS_GOOD} \nЗамечания (${count}) переданы не будут!`, backButtonForDepartmentKey(room.departmentKey));
         return;
     }
 
@@ -225,7 +228,8 @@ bot.on('callback_query', async (callbackQuery) => {
         const roomCallbackData = data.replace('open_comments_', '');
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'pending');
         let room = getRoomByCallbackData(roomCallbackData);
-        bot.sendMessage(msg.chat.id, 'Замечания открыты. Вы можете продолжать комментировать.', backButtonForDepartmentKey(room.departmentKey));
+        const count = await db.getMessageCountForRoom(roomCallbackData);
+        bot.sendMessage(msg.chat.id, `Вы можете продолжать комментировать.\nЗамечания открыты ${STATUS_PENDING}`, backButtonForDepartmentKey(room.departmentKey));
         return;
     }
 
@@ -233,7 +237,7 @@ bot.on('callback_query', async (callbackQuery) => {
         bot.sendMessage(msg.chat.id, 'Выберите отдел:', await generateMainMenu());
         await db.updateUserRoom(callbackQuery.from.id.toString(), 'none');
     } else if (rooms[data]) {
-        bot.sendMessage(msg.chat.id, 'Выберите подразделение:', await generateRoomMenu(data));
+        bot.sendMessage(msg.chat.id, `📍 ${rooms[data].title}\nВыберите помещение:`, await generateRoomMenu(data));
         await db.updateUserRoom(callbackQuery.from.id.toString(), 'none');
     } else {
         let found = false;
@@ -251,7 +255,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 }
                 let messageText = `🤖 Вы можете дополнить ${count} замечаний, пишите мне в ответ, подкрепляя фотографиями!\n\n${room.intermediate_message}\n\n${destination}`;
                 if (status === 'good') {
-                    messageText = `🤖 Замечания (${count}) переданы не будут \n\n ${destination}`;
+                    messageText = `🤖 Замечания (${count}) переданы не будут ${StATUS_GOOD} \n\n ${destination}`;
                 }
                 
                 const inline_keyboard = [
