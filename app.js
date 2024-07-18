@@ -14,6 +14,7 @@ const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
 const STATUS_DEPARTMENT_FULL = '✅';       // check
 const STATUS_DEPARTMENT_PARTLY = '☑️';     // check
+const STATUS_DEPARTMENT_EMPTY = '✖️';
 const STATUS_ROOM_GOOD = '👍';       // 100%
 const STATUS_ROOM_COMMENTED = '✍️';       // 100%
 const STATUS_ROOM_VIEWED = '✔';    //
@@ -40,7 +41,7 @@ const generateMainMenu = async () => {
 
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
         const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
-        let check = '☐';
+        let check = STATUS_DEPARTMENT_EMPTY;
         if (roomsWithComments == totalRooms) {
             check = STATUS_DEPARTMENT_FULL;
         } else if (roomsWithComments > 0 ) {
@@ -60,19 +61,14 @@ const generateRoomMenu = async (department) => {
         const count = await db.getMessageCountForRoom(room.callback_data);
         const status = await db.getRoomStatus(room.callback_data);
         let prependText = '';
-        if (count > 0) {
-            prependText = STATUS_ROOM_VIEWED;
-        } else {
-            prependText = STATUS_ROOM_EMPTY;
-        }
-        let appendText = '';
         if (status === 'good') {
-            appendText = '(' + count + ') ' + STATUS_ROOM_GOOD 
+            prependText = STATUS_ROOM_GOOD 
         } else if (count == 0) {
-            appendText =  '(' + count + ') ' + STATUS_ROOM_EMPTY;
+            prependText = STATUS_ROOM_EMPTY;
         } else {
-            appendText =  '(' + count + ') ' + STATUS_ROOM_COMMENTED;
+            prependText = STATUS_ROOM_COMMENTED;
         }
+        let appendText = '(' + count + ')';
         return [{ text: `${prependText} ${room.name} ${appendText}`, callback_data: room.callback_data }];
     }));
     buttons.push([{ text: 'Назад к отделам', callback_data: 'back_to_departments' }]);
@@ -223,7 +219,13 @@ bot.on('callback_query', async (callbackQuery) => {
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'good');
         const count = await db.getMessageCountForRoom(roomCallbackData);
         let room = getRoomByCallbackData(roomCallbackData);
-        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${STATUS_ROOM_GOOD} \nЗамечания (${count}) переданы не будут!`, backButtonForDepartmentKey(room.departmentKey));
+
+        // Send confirmation message
+        await bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${STATUS_ROOM_GOOD} \nЗамечания (${count}) переданы не будут!`);
+
+        // Simulate pressing "back to department" button by sending a new message with department menu
+        await bot.sendMessage(msg.chat.id, `Вы вернулись к отделу: \n📍${rooms[room.departmentKey].title}`, await generateRoomMenu(room.departmentKey));
+        await db.updateUserRoom(callbackQuery.from.id.toString(), 'none');
         return;
     }
 
@@ -289,6 +291,7 @@ bot.on('callback_query', async (callbackQuery) => {
         }
     }
 });
+
 
 
 console.log('https://t.me/g1_remarks_bot');
