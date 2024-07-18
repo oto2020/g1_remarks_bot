@@ -11,33 +11,66 @@ const groupId = '-4263608042'; // Идентификатор группы
 // Load rooms data
 const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
+const StATUS_GOOD = '💯';       // 100%
+const STATUS_PENDING = '🧐';    //
+const STATUS_FULL = '✅';       // check
+const STATUS_PARTLY = '☑️';     // check
 
-// Function to count messages for a department and check if all rooms have comments
-const getMessageCountForDepartment = async (departmentKey) => {
-    const department = rooms[departmentKey];
-    let totalMessages = 0;
-    let roomsWithComments = 0;
-
-    for (const room of department.rooms) {
-        const count = await db.getMessageCountForRoom(room.callback_data);
-        totalMessages += count;
-        if (count > 0) {
-            roomsWithComments += 1;
-        }
-    }
-
-    return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
-};
-
-// Function to generate main menu
+// ГЕНЕРАЦИЯ ГЛАВНОГО МЕНЮ ПОДРАЗДЕЛЕНИЙ
 const generateMainMenu = async () => {
+
+    // Количество сообщений по всем помещениям департамента
+    const getMessageCountForDepartment = async (departmentKey) => {
+        const department = rooms[departmentKey];
+        let totalMessages = 0;
+        let roomsWithComments = 0;
+
+        for (const room of department.rooms) {
+            const count = await db.getMessageCountForRoom(room.callback_data);
+            totalMessages += count;
+            if (count > 0) {
+                roomsWithComments += 1;
+            }
+        }
+        return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
+    };
+
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
         const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
         let check = '';
-        if (roomsWithComments == totalRooms) check = '✅';
-        else if (roomsWithComments > 0 ) check = '☑️';
+        if (roomsWithComments == totalRooms) {
+            check = STATUS_FULL;
+        } else if (roomsWithComments > 0 ) {
+            check = STATUS_PARTLY;
+        }
         return [{ text: `${check} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
     }));
+    return {
+        reply_markup: {
+            inline_keyboard: buttons
+        }
+    };
+};
+// ГЕНЕРАЦИЯ ВТОРОГО МЕНЮ ПОМЕЩЕНИЙ, 
+const generateRoomMenu = async (department) => {
+    const buttons = await Promise.all(rooms[department].rooms.map(async room => {
+        const count = await db.getMessageCountForRoom(room.callback_data);
+        const status = await db.getRoomStatus(room.callback_data);
+        let prependText = '';
+        if (count > 0) {
+            prependText = '';
+        } else {
+            prependText = ''
+        }
+        let appendText = '';
+        if (status === 'good') {
+            appendText = StATUS_GOOD 
+        } else {
+            appendText = STATUS_PENDING + ' (' + count + ')';
+        }
+        return [{ text: `${room.name} ${appendText}`, callback_data: room.callback_data }];
+    }));
+    buttons.push([{ text: 'Назад к отделам', callback_data: 'back_to_departments' }]);
     return {
         reply_markup: {
             inline_keyboard: buttons
@@ -57,21 +90,8 @@ const backButtonForDepartmentKey = (departmentKey) => {
 };
 
 
-// создает список помещений, 
-const generateRoomMenu = async (department) => {
-    const buttons = await Promise.all(rooms[department].rooms.map(async room => {
-        const count = await db.getMessageCountForRoom(room.callback_data);
-        const status = await db.getRoomStatus(room.callback_data);
-        let appendText = (status === 'good') ? '💯' : '(' + count + ')';
-        return [{ text: `${room.name} ${appendText}`, callback_data: room.callback_data }];
-    }));
-    buttons.push([{ text: 'Назад к отделам', callback_data: 'back_to_departments' }]);
-    return {
-        reply_markup: {
-            inline_keyboard: buttons
-        }
-    };
-};
+
+
 
 
 const getRoomByCallbackData = (callbackData) => {
@@ -197,7 +217,7 @@ bot.on('callback_query', async (callbackQuery) => {
         const roomCallbackData = data.replace('mark_good_', '');
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'good');
         let room = getRoomByCallbackData(roomCallbackData);
-        bot.sendMessage(msg.chat.id, '🤖 Комната отмечена как в порядке. Замечания переданы не будут 💯 !', backButtonForDepartmentKey(room.departmentKey));
+        bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке. Замечания переданы не будут ${StATUS_GOOD} !`, backButtonForDepartmentKey(room.departmentKey));
         return;
     }
 
@@ -239,9 +259,9 @@ bot.on('callback_query', async (callbackQuery) => {
                 ];
 
                 if (status === 'good') {
-                    inline_keyboard.unshift([{ text: '🧐 Открыть замечания 🧐', callback_data: `open_comments_${data}` }]);
+                    inline_keyboard.unshift([{ text: `${STATUS_PENDING} Открыть замечания ${STATUS_PENDING}`, callback_data: `open_comments_${data}` }]);
                 } else {
-                    inline_keyboard.unshift([{ text: '💯 Отметить как всё в порядке 💯', callback_data: `mark_good_${data}` }]);
+                    inline_keyboard.unshift([{ text: `${StATUS_GOOD} Отметить как всё в порядке ${StATUS_GOOD}`, callback_data: `mark_good_${data}` }]);
                 }
 
                 bot.sendMessage(msg.chat.id, messageText, {
