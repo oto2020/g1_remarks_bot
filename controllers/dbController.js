@@ -31,6 +31,17 @@ async function saveMessage(telegramId, chatId, callbackData, content, type, text
 
 // Update current room for user
 async function updateUserRoom(telegramId, currentRoom) {
+
+    let user = await prisma.user.findUnique({
+        where: { telegramId }
+    });
+    if (!user) {
+        user = await prisma.user.create({
+            data: { telegramId }
+        });
+    }
+
+    
     if (!telegramId || !currentRoom) {
         console.log('ошибка, связанная с ', telegramId, currentRoom);
         return;
