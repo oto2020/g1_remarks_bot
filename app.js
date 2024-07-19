@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
 const db = require('./controllers/dbController');
+const tg = require('./controllers/tgController');
 
 const token = process.env.TOKEN;
 const bot = new TelegramBot(token, { polling: true });
@@ -113,66 +114,7 @@ const getRoomByCallbackData = (callbackData) => {
 };
 
 
-// Function to send all messages of a room to the user
-const sendMessagesForRoom = async (chatId, callbackData) => {
-    let room = getRoomByCallbackData(callbackData);
-    const messages = await db.getMessagesForRoom(callbackData);
 
-    let firstTimestamp = null;
-    let lastTimestamp = null;
-
-    if (messages.length > 0) {
-        firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
-        lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
-        console.log(firstTimestamp, lastTimestamp);
-        await bot.sendMessage(chatId, `🤖 Ранее вы писали:`);
-    } else {
-        // await bot.sendMessage(chatId, `🤖 Сообщения по помещению ${room.departmentTitle} "${room.roomName}" отсутствуют. Пожалуйста, сделайте фото и оставьте комментарий.`);
-    }
-
-    let photoGroup = [];
-    let currentCaption = '';
-    let lastTextMessage = null;
-
-    for (let i = 0; i < messages.length; i++) {
-        let message = messages[i];
-        let messageText = '👤 ' + message.text;
-        if (message.type === 'text') {
-            if (lastTextMessage !== null) {
-                await bot.sendMessage(chatId, lastTextMessage);
-
-                lastTextMessage = null;
-            }
-            if (photoGroup.length > 0) {
-                await bot.sendMediaGroup(chatId, photoGroup);
-                photoGroup = [];
-                currentCaption = '';
-            }
-            lastTextMessage = `${messageText}`;
-        }
-
-        if (message.type === 'photo') {
-            if (photoGroup.length > 0 && message.text && message.text !== currentCaption) {
-                await bot.sendMediaGroup(chatId, photoGroup);
-                photoGroup = [];
-                currentCaption = '';
-            }
-            if (photoGroup.length === 0) {
-                currentCaption = message.text ? `${messageText}` : '';
-                photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
-            } else {
-                photoGroup.push({ type: 'photo', media: message.content });
-            }
-        }
-    }
-
-    if (lastTextMessage !== null) {
-        await bot.sendMessage(chatId, lastTextMessage);
-    }
-    if (photoGroup.length > 0) {
-        await bot.sendMediaGroup(chatId, photoGroup);
-    }
-};
 
 
 
@@ -234,7 +176,10 @@ bot.on('callback_query', async (callbackQuery) => {
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'pending');
         let room = getRoomByCallbackData(roomCallbackData);
         const count = await db.getMessageCountForRoom(roomCallbackData);
-        await sendMessagesForRoom(msg.chat.id, roomCallbackData);
+        
+        const messages = await db.getMessagesForRoom(roomCallbackData);
+        await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
+
         bot.sendMessage(msg.chat.id, `Вы можете продолжать комментировать.\nЗамечания открыты ${STATUS_ROOM_COMMENTED}`, backButtonForDepartmentKey(room.departmentKey));
         return;
     }
@@ -257,7 +202,8 @@ bot.on('callback_query', async (callbackQuery) => {
 
                 await db.updateUserRoom(callbackQuery.from.id.toString(), data);
                 if (status !== 'good') {
-                    await sendMessagesForRoom(msg.chat.id, data);
+                    const messages = await db.getMessagesForRoom(data);
+                    await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
                 }
                 let messageText = `🤖 Вы можете дополнить ${count} замечаний, пишите мне в ответ, подкрепляя фотографиями!\n\n${room.intermediate_message}\n\n${destination}`;
                 if (status === 'good') {
