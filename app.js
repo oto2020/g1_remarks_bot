@@ -59,7 +59,11 @@ bot.on('message', async (msg) => {
         const count = await db.getMessageCountForRoom(callbackData);
         let room = getRoomByCallbackData(callbackData);
         if (!room) return;
-        bot.sendMessage(msg.chat.id, `🤖 Спасибо!\nСообщения (${count}) дополнены.\nВы можете продолжить в этом чате или перейти к следующей комнате.`, backButtonForDepartmentKey(room.departmentKey));
+        bot.sendMessage(
+            msg.chat.id, 
+            `🤖 Спасибо!\nСообщения (${count}) дополнены.\nВы можете продолжить в этом чате или перейти к следующей комнате.`, 
+            backButtonForDepartmentKey(room.departmentKey)
+        );
     }
 });
 
@@ -75,7 +79,10 @@ bot.on('callback_query', async (callbackQuery) => {
         let room = getRoomByCallbackData(roomCallbackData);
 
         // Send confirmation message
-        await bot.sendMessage(msg.chat.id, `🤖 Комната отмечена как в порядке ${STATUS_ROOM_GOOD} \nЗамечания (${count}) переданы не будут!`);
+        await bot.sendMessage(
+            msg.chat.id, 
+            `🤖 Комната отмечена как в порядке ${STATUS_ROOM_GOOD} \nЗамечания (${count}) переданы не будут!`
+        );
 
         // Simulate pressing "back to department" button by sending a new message with department menu
         await tg.sendRoomMenu(bot, msg.chat.id, room.departmentKey);
@@ -87,12 +94,15 @@ bot.on('callback_query', async (callbackQuery) => {
         const roomCallbackData = data.replace('open_comments_', '');
         await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'pending');
         let room = getRoomByCallbackData(roomCallbackData);
-        const count = await db.getMessageCountForRoom(roomCallbackData);
-        
+
         const messages = await db.getMessagesForRoom(roomCallbackData);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
 
-        bot.sendMessage(msg.chat.id, `Вы можете продолжать комментировать.\nЗамечания открыты ${STATUS_ROOM_COMMENTED}`, backButtonForDepartmentKey(room.departmentKey));
+        bot.sendMessage(
+            msg.chat.id,
+            `Вы можете продолжать комментировать.\nЗамечания открыты ${STATUS_ROOM_COMMENTED}`,
+            backButtonForDepartmentKey(room.departmentKey)
+        );
         return;
     }
 
@@ -121,7 +131,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 if (status === 'good') {
                     messageText = `🤖 Замечания (${count}) переданы не будут ${STATUS_ROOM_GOOD} \n\n ${destination}`;
                 }
-                
+
                 const inline_keyboard = [
                     [{ text: 'Назад к отделу', callback_data: `back_to_${department}` }]
                 ];
