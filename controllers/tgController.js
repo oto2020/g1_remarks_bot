@@ -1,27 +1,88 @@
 
 
 const fs = require('fs');
+const db = require('./dbController');
 
 const groupId = '-4263608042'; // Идентификатор группы
 
-// // Load rooms data
-// const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
-// const getRoomByCallbackData = (callbackData) => {
-//     for (const departmentKey in rooms) {
-//         const department = rooms[departmentKey];
-//         const room = department.rooms.find(room => room.callback_data === callbackData);
-//         if (room) {
-//             return {
-//                 departmentKey: departmentKey,
-//                 departmentTitle: department.title,
-//                 roomName: room.name,
-//                 roomIntermediateMessage: room.intermediate_message,
-//                 roomCallbackData: room.callback_data
-//             };
-//         }
-//     }
-//     return null; // Возвращает null, если помещение не найдено
-// };
+// Load rooms data
+const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
+
+
+const STATUS_DEPARTMENT_FULL = '✅';       // check
+const STATUS_DEPARTMENT_PARTLY = '☑️';     // check
+const STATUS_DEPARTMENT_EMPTY = '✖️';
+const STATUS_ROOM_EMPTY = '✖️';
+const STATUS_ROOM_GOOD = '👍';       // 100%
+const STATUS_ROOM_COMMENTED = '✍️';       // 100%
+
+
+// ГЕНЕРАЦИЯ ГЛАВНОГО МЕНЮ ПОДРАЗДЕЛЕНИЙ
+const generateMainMenu = async () => {
+    // Количество сообщений по всем помещениям департамента
+    const getMessageCountForDepartment = async (departmentKey) => {
+        const department = rooms[departmentKey];
+        let totalMessages = 0;
+        let roomsWithComments = 0;
+
+        for (const room of department.rooms) {
+            const count = await db.getMessageCountForRoom(room.callback_data) || await db.getMessageStatusGoodCountForRoom(room.callback_data);
+            totalMessages += count;
+            if (count > 0) {
+                roomsWithComments += 1;
+            }
+        }
+        return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
+    };
+
+    const buttons = await Promise.all(Object.keys(rooms).map(async key => {
+        const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
+        let check = STATUS_DEPARTMENT_EMPTY;
+        if (roomsWithComments == totalRooms) {
+            check = STATUS_DEPARTMENT_FULL;
+        } else if (roomsWithComments > 0 ) {
+            check = STATUS_DEPARTMENT_PARTLY;
+        }
+        return [{ text: `${check} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
+    }));
+    return {
+        reply_markup: {
+            inline_keyboard: buttons
+        }
+    };
+};
+async function sendMainMenu(bot, chatId) {
+    await bot.sendMessage(chatId, 'Выберите отдел:', await generateMainMenu());
+}
+
+
+// ГЕНЕРАЦИЯ ВТОРОГО МЕНЮ ПОМЕЩЕНИЙ, 
+const generateRoomMenu = async (department) => {
+    const buttons = await Promise.all(rooms[department].rooms.map(async room => {
+        const count = await db.getMessageCountForRoom(room.callback_data);
+        const status = await db.getRoomStatus(room.callback_data);
+        let prependText = '';
+        if (status === 'good') {
+            prependText = STATUS_ROOM_GOOD 
+        } else if (count == 0) {
+            prependText = STATUS_ROOM_EMPTY;
+        } else {
+            prependText = STATUS_ROOM_COMMENTED;
+        }
+        let appendText = '(' + count + ')';
+        return [{ text: `${prependText} ${room.name} ${appendText}`, callback_data: room.callback_data }];
+    }));
+    buttons.push([{ text: 'Назад к отделам', callback_data: 'back_to_departments' }]);
+    return {
+        reply_markup: {
+            inline_keyboard: buttons
+        }
+    };
+};
+async function sendRoomMenu(bot, chatId, departmentKey) {
+    await bot.sendMessage(chatId, `Вы вернулись к отделу: \n📍${rooms[departmentKey].title}`, await generateRoomMenu(departmentKey));
+}
+
 
 // Function to send all messages of a room to the user
 const sendMessagesForRoom = async (bot, chatId, messages) => {
@@ -86,11 +147,6 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
 // async function functionName () {};
 module.exports = {
     sendMessagesForRoom,
-    // getCallbackData,
-    // getAllMessages,
-    // getMessageCountForRoom,
-    // getMessageStatusGoodCountForRoom,
-    // getMessagesForRoom,
-    // saveRoomStatus,
-    // getRoomStatus
+    sendMainMenu,
+    sendRoomMenu
 };
