@@ -1,8 +1,9 @@
 -- CreateTable
 CREATE TABLE `User` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `telegramId` VARCHAR(191) NOT NULL,
-    `currentRoom` VARCHAR(191) NULL DEFAULT 'none',
+    `telegramId` INTEGER NOT NULL,
+    `phoneNumber` INTEGER NULL,
+    `position` VARCHAR(191) NULL,
 
     UNIQUE INDEX `User_telegramId_key`(`telegramId`),
     PRIMARY KEY (`id`)

@@ -31,35 +31,6 @@ async function saveMessage(telegramId, chatId, callbackData, content, type, text
     });
 }
 
-// Update current room for user
-async function updateUserRoom(telegramId, currentRoom) {
-
-    let user = await prisma.user.findUnique({
-        where: { telegramId }
-    });
-    if (!user) {
-        user = await prisma.user.create({
-            data: { telegramId }
-        });
-    }
-
-    
-    if (!telegramId || !currentRoom) {
-        console.log('ошибка, связанная с ', telegramId, currentRoom);
-        return;
-    }
-    return await prisma.user.update({
-        where: { telegramId },
-        data: { currentRoom },
-    });
-}
-
-// Get current room for user
-async function getCallbackData(telegramId) {
-    const user = await getUser(telegramId);
-    return user.currentRoom;
-}
-
 // Get all messages of a user
 async function getAllMessages(telegramId) {
     const user = await getUser(telegramId);
@@ -148,8 +119,6 @@ async function getRoomStatus(callbackData) {
 module.exports = {
     getUser,
     saveMessage,
-    updateUserRoom,
-    getCallbackData,
     getAllMessages,
     getMessageCountForRoom,
     getMessageStatusGoodCountForRoom,

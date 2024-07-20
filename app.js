@@ -11,6 +11,21 @@ const bot = new TelegramBot(token, { polling: true });
 
 const groupId = '-4263608042'; // Идентификатор группы
 
+// status: unknown/regPhoneSharing/regNameSharing/regPositionSharing/known
+// room: none/*callbackData их rooms.json*
+const userStatuses = new Map();
+
+// не пропустит, пока пользователь не будет создан в БД
+async function userStatusesHandler(chatId) {
+    // для любого нового chatId создаем новый элемент коллекции
+    if (!userStatuses.has(chatId)) {
+        userStatuses.set(chatId, { status: 'unknown', room: 'none' });
+    }
+    // смотрим на наличие в БД
+    
+
+}
+
 // Load rooms data
 const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
@@ -36,7 +51,8 @@ const getRoomByCallbackData = (callbackData) => {
 
 const sendRoomMenu = async (chatId, departmentKey) => {
     await tg.sendRoomMenu(bot, chatId, departmentKey);
-    await db.updateUserRoom(chatId.toString(), 'none');
+    // userStatus changing
+    userStatuses.get(chatId).room = 'none';
 };
 
 const sendBackButton = (departmentKey) => ({
@@ -46,18 +62,18 @@ const sendBackButton = (departmentKey) => ({
 });
 
 const handleMessage = async (msg) => {
-    const callbackData = await db.getCallbackData(msg.from.id.toString());
+    const callbackData = userStatuses.get(msg.chat.id).room;
     if (callbackData === 'none') {
         await tg.sendMainMenu(bot, msg.chat.id);
         return;
     }
 
     if (msg.text) {
-        await db.saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, msg.text, 'text', msg.text);
+        await db.saveMessage(msg.from.id, msg.chat.id, callbackData, msg.text, 'text', msg.text);
     } else if (msg.photo) {
         const fileId = msg.photo[msg.photo.length - 1].file_id;
         const caption = msg.caption || null;
-        await db.saveMessage(msg.from.id.toString(), msg.chat.id, callbackData, fileId, 'photo', caption);
+        await db.saveMessage(msg.from.id, msg.chat.id, callbackData, fileId, 'photo', caption);
     }
 
     const count = await db.getMessageCountForRoom(callbackData);
@@ -77,7 +93,7 @@ const handleCallbackQuery = async (callbackQuery) => {
 
     if (data.startsWith('mark_good_')) {
         const roomCallbackData = data.replace('mark_good_', '');
-        await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'good');
+        await db.saveRoomStatus(callbackQuery.from.id, roomCallbackData, 'good');
         const count = await db.getMessageCountForRoom(roomCallbackData);
         const room = getRoomByCallbackData(roomCallbackData);
 
@@ -92,7 +108,7 @@ const handleCallbackQuery = async (callbackQuery) => {
 
     if (data.startsWith('open_comments_')) {
         const roomCallbackData = data.replace('open_comments_', '');
-        await db.saveRoomStatus(callbackQuery.from.id.toString(), roomCallbackData, 'pending');
+        await db.saveRoomStatus(callbackQuery.from.id, roomCallbackData, 'pending');
         const room = getRoomByCallbackData(roomCallbackData);
 
         const messages = await db.getMessagesForRoom(roomCallbackData);
@@ -108,7 +124,8 @@ const handleCallbackQuery = async (callbackQuery) => {
 
     if (data === 'back_to_departments') {
         await tg.sendMainMenu(bot, msg.chat.id);
-        await db.updateUserRoom(callbackQuery.from.id.toString(), 'none');
+        // userStatus changing
+        userStatuses.get(callbackQuery.from.id).room = 'none';
         return;
     }
 
@@ -139,8 +156,9 @@ const handleRoomSelection = async (callbackQuery, data, room, department) => {
     const count = await db.getMessageCountForRoom(data);
     const status = await db.getRoomStatus(data);
 
-    await db.updateUserRoom(callbackQuery.from.id.toString(), data);
-
+    // userStatus changing
+    userStatuses.get(callbackQuery.from.id).room = data;
+;
     if (status !== 'good') {
         const messages = await db.getMessagesForRoom(data);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
@@ -165,18 +183,24 @@ const handleRoomSelection = async (callbackQuery, data, room, department) => {
 
 // Команда /start
 bot.onText(/\/start/, async (msg) => {
+    console.log('start', msg.date);
+    userStatusesHandler(msg.chat.id);
     await tg.sendMainMenu(bot, msg.chat.id);
 });
 
 // Получение сообщения
 bot.on('message', async (msg) => {
     if (msg.from.id !== bot.id) {
+        console.log(`message`, msg.date);
+        userStatusesHandler(msg.chat.id);
         await handleMessage(msg);
     }
 });
 
 // Нажатие кнопки
 bot.on('callback_query', async (callbackQuery) => {
+    console.log(`callback_query`, callbackQuery.data);
+    userStatusesHandler(callbackQuery.from.id);
     await handleCallbackQuery(callbackQuery);
 });
 
