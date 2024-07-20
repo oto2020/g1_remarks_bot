@@ -143,10 +143,23 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
     }
 };
 
-
+async function sendContactRequest (bot, chatId) {
+    await bot.sendMessage(chatId, 'Пожалуйста, поделитесь своим контактом для продолжения.', {
+        reply_markup: {
+            one_time_keyboard: true,
+            keyboard: [
+                [{
+                    text: 'Поделиться контактом',
+                    request_contact: true
+                }]
+            ]
+        }
+    });
+}
 // async function functionName () {};
 module.exports = {
     sendMessagesForRoom,
     sendMainMenu,
-    sendRoomMenu
+    sendRoomMenu,
+    sendContactRequest
 };
