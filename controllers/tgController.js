@@ -35,16 +35,29 @@ const generateMainMenu = async () => {
         return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
     };
 
+    let counter = 0;
     const buttons = await Promise.all(Object.keys(rooms).map(async key => {
         const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
         let check = STATUS_DEPARTMENT_EMPTY;
         if (roomsWithComments == totalRooms) {
             check = STATUS_DEPARTMENT_FULL;
+            counter++;
         } else if (roomsWithComments > 0 ) {
             check = STATUS_DEPARTMENT_PARTLY;
         }
         return [{ text: `${check} ${rooms[key].title} ${roomsWithComments}/${totalRooms} (${totalMessages})`, callback_data: key }];
     }));
+    if (counter === buttons.length) {
+        console.log('Обход завершен!');
+        buttons.push(
+            [
+                {
+                    text: "🥳 ОТПРАВИТЬ РЕЗУЛЬТАТ ЗА СЕГОДНЯ В ЧАТ! 🥳",
+                    callback_data: "SEND_TO_GROUP",
+                },
+            ]
+        );
+    }
     return {
         reply_markup: {
             inline_keyboard: buttons

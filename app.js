@@ -43,7 +43,7 @@ async function registrationMiddleware(chatId) {
     // смотрим на наличие в БД
     let user = await db.getUser(chatId);
     if (user) {
-        userStatuses.get(chatId).step === STEPS.COMPLETED;
+        userStatuses.get(chatId).step = STEPS.COMPLETED;
         return true;
     }
     // клиента нет в базе 
