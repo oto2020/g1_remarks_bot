@@ -34,14 +34,6 @@ async function saveMessage(chatId, callbackData, content, type, text = null) {
     });
 }
 
-// Get all messages of a user
-async function getAllMessages(chatId) {
-    const user = await getUser(chatId);
-    return await prisma.message.findMany({
-        where: { userId: user.id },
-        orderBy: { timestamp: 'asc' }
-    });
-}
 
 // Get count of messages for a room
 async function getMessageCountForRoom(callbackData) {
@@ -127,7 +119,6 @@ module.exports = {
     createUser,
     getUser,
     saveMessage,
-    getAllMessages,
     getMessageCountForRoom,
     getMessageStatusGoodCountForRoom,
     getMessagesForRoom,
