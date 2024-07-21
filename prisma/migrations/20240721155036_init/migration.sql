@@ -1,11 +1,13 @@
 -- CreateTable
 CREATE TABLE `User` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `telegramId` INTEGER NOT NULL,
-    `phoneNumber` INTEGER NULL,
+    `chatId` INTEGER NOT NULL,
+    `name` VARCHAR(191) NULL,
+    `phoneNumber` VARCHAR(191) NULL,
     `position` VARCHAR(191) NULL,
+    `timestamp` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `User_telegramId_key`(`telegramId`),
+    UNIQUE INDEX `User_chatId_key`(`chatId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

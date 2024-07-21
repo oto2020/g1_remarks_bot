@@ -105,7 +105,10 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
 
     for (let i = 0; i < messages.length; i++) {
         let message = messages[i];
-        let messageText = '👤 ' + message.text;
+        const date = new Date(message.timestamp);
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n` + message.text;
         if (message.type === 'text') {
             if (lastTextMessage !== null) {
                 await bot.sendMessage(chatId, lastTextMessage);
@@ -144,7 +147,7 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
 };
 
 async function sendContactRequest (bot, chatId) {
-    await bot.sendMessage(chatId, 'Пожалуйста, поделитесь своим контактом для продолжения.', {
+    await bot.sendMessage(chatId, '🤖 Пожалуйста, поделитесь своим контактом для продолжения.', {
         reply_markup: {
             one_time_keyboard: true,
             keyboard: [

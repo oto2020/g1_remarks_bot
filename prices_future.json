@@ -1,0 +1,39 @@
+,
+    "ElasticButtocks": {
+        "title": "Упругие ягодицы",
+        "buttons": [
+            {
+                "text": "Вступление (бесплатно)",
+                "callback_data": "ElasticButtocks_IntroductionFree_0",
+                "intermediate_message": "Вы выбрали Вступление. Оно бесплатное, начнём!\nhttps://www.youtube.com/channel/UCA9PsdkOb_FQPkyuqvQnLow"
+            },
+            {
+                "text": "День 1 (7 рублей)",
+                "callback_data": "ElasticButtocks_Day1_7",
+                "intermediate_message": "Вы выбрали День 1. \nСекунду, мы готовим платежную ссылку для вас.",
+                "success_message": "Вот ваша ссылка на День 1: https://t.me/+mKvfSpA5ek5jMDRi"
+            },
+            {
+                "text": "День 2 (7 рублей)",
+                "callback_data": "ElasticButtocks_Day2_7",
+                "intermediate_message": "Вы выбрали День 2. \nСекунду, мы готовим платежную ссылку для вас.",
+                "success_message": "Вот ваша ссылка на День 2: https://t.me/+rtpc9aatq-80MmU6"
+            },
+            {
+                "text": "День 3 (7 рублей)",
+                "callback_data": "ElasticButtocks_Day3_7",
+                "intermediate_message": "Вы выбрали День 3. \nСекунду, мы готовим платежную ссылку для вас.",
+                "success_message": "Вот ваша ссылка на День 3: https://t.me/+M6vpmsmLIlYzYWMy"
+            },
+            {
+                "text": "Курс целиком (10 рублей)",
+                "callback_data": "ElasticButtocks_FullCourse_10",
+                "intermediate_message": "Вы выбрали Курс целиком. \nСекунду, мы готовим платежную ссылку для вас.",
+                "success_message": "Курс состоит из трёх дней:\nДень 1: https://t.me/+mKvfSpA5ek5jMDRi\nДень 2: https://t.me/+rtpc9aatq-80MmU6\nДень 3: https://t.me/+M6vpmsmLIlYzYWMy\nРекомендуется выполнять упражнения, распределив дни тренировок на всю неделю."
+            },
+            {
+                "text": "Назад ко всем курсам",
+                "callback_data": "Back"
+            }
+        ]
+    }

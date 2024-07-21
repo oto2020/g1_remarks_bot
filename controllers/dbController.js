@@ -3,22 +3,25 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Create or get user by Telegram ID
-async function getUser(telegramId) {
-    let user = await prisma.user.findUnique({
-        where: { telegramId }
+
+// Get user by Chat ID
+async function createUser(data) {
+    user = await prisma.user.create({
+        data: data
     });
-    if (!user) {
-        user = await prisma.user.create({
-            data: { telegramId }
-        });
-    }
+}
+
+// Get user by Chat ID
+async function getUser(chatId) {
+    let user = await prisma.user.findUnique({
+        where: { chatId }
+    });
     return user;
 }
 
 // Save message
-async function saveMessage(telegramId, chatId, callbackData, content, type, text = null) {
-    const user = await getUser(telegramId);
+async function saveMessage(chatId, callbackData, content, type, text = null) {
+    const user = await getUser(chatId);
     return await prisma.message.create({
         data: {
             content,
@@ -32,8 +35,8 @@ async function saveMessage(telegramId, chatId, callbackData, content, type, text
 }
 
 // Get all messages of a user
-async function getAllMessages(telegramId) {
-    const user = await getUser(telegramId);
+async function getAllMessages(chatId) {
+    const user = await getUser(chatId);
     return await prisma.message.findMany({
         where: { userId: user.id },
         orderBy: { timestamp: 'asc' }
@@ -82,13 +85,17 @@ async function getMessageStatusGoodCountForRoom(callbackData) {
 async function getMessagesForRoom(callbackData) {
     return await prisma.message.findMany({
         where: { callbackData },
-        orderBy: { timestamp: 'asc' }
+        orderBy: { timestamp: 'asc' },
+        include: {
+            user: true,
+        },
     });
 }
 
 
+
 // Save room status message
-async function saveRoomStatus(telegramId, callbackData, status) {
+async function saveRoomStatus(chatId, callbackData, status) {
     await prisma.message.deleteMany({
         where: { 
             callbackData: callbackData,
@@ -96,7 +103,7 @@ async function saveRoomStatus(telegramId, callbackData, status) {
          }
     });
 
-    const user = await getUser(telegramId);
+    const user = await getUser(chatId);
     return await prisma.message.create({
         data: {
             content: status,
@@ -117,6 +124,7 @@ async function getRoomStatus(callbackData) {
     return statusMessage ? statusMessage.content : 'pending';
 }
 module.exports = {
+    createUser,
     getUser,
     saveMessage,
     getAllMessages,

@@ -14,7 +14,7 @@ model User {
   chatId      Int       @unique
   messages    Message[]
   name        String?
-  phoneNumber Int?
+  phoneNumber String?
   position    String?
   timestamp   DateTime  @default(now())
 }
