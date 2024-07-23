@@ -2,6 +2,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { startOfDay, endOfDay } = require('date-fns');
 
 
 // Get user by Chat ID
@@ -34,7 +35,6 @@ async function saveMessage(chatId, callbackData, content, type, text = null) {
     });
 }
 
-
 // Get count of messages for a room
 async function getMessageCountForRoom(callbackData) {
     try {
@@ -43,55 +43,73 @@ async function getMessageCountForRoom(callbackData) {
                 callbackData: callbackData,
                 type: {
                     not: 'status'
+                },
+                timestamp: {
+                    gte: startOfDay(new Date()),
+                    lt: endOfDay(new Date())
                 }
             }
         });
         return count;
     } catch (error) {
         console.error("Error getting message count for room:", error);
-        throw error; // Проброс ошибки для дальнейшей обработки, если необходимо
+        throw error;
     }
 }
 
-// Get count of messages for a room
+//  Get count of messages for a room
 async function getMessageStatusGoodCountForRoom(callbackData) {
     try {
         const count = await prisma.message.count({
             where: {
                 callbackData: callbackData,
                 type: 'status',
-                content: 'good'
+                content: 'good',
+                timestamp: {
+                    gte: startOfDay(new Date()),
+                    lt: endOfDay(new Date())
+                }
             }
         });
         return count;
     } catch (error) {
-        console.error("Error getting message satus good count for room:", error);
-        throw error; // Проброс ошибки для дальнейшей обработки, если необходимо
+        console.error("Error getting message status good count for room:", error);
+        throw error;
     }
 }
 
-
-
-
 // Get all messages for a room
 async function getMessagesForRoom(callbackData) {
-    return await prisma.message.findMany({
-        where: { callbackData },
-        orderBy: { timestamp: 'asc' },
-        include: {
-            user: true,
-        },
-    });
+    try {
+        return await prisma.message.findMany({
+            where: {
+                callbackData: callbackData,
+                timestamp: {
+                    gte: startOfDay(new Date()),
+                    lt: endOfDay(new Date())
+                }
+            },
+            orderBy: { timestamp: 'asc' },
+            include: {
+                user: true,
+            },
+        });
+    } catch (error) {
+        console.error("Error getting messages for room:", error);
+        throw error;
+    }
 }
-
-
 
 // Save room status message
 async function saveRoomStatus(chatId, callbackData, status) {
     await prisma.message.deleteMany({
         where: { 
             callbackData: callbackData,
-            type: 'status'
+            type: 'status',
+            timestamp: {
+                gte: startOfDay(new Date()),
+                lt: endOfDay(new Date())
+            }
          }
     });
 
@@ -110,11 +128,44 @@ async function saveRoomStatus(chatId, callbackData, status) {
 // Get room status
 async function getRoomStatus(callbackData) {
     const statusMessage = await prisma.message.findFirst({
-        where: { callbackData, type: 'status' },
+        where: { 
+            callbackData, type: 'status',
+            timestamp: {
+                gte: startOfDay(new Date()),
+                lt: endOfDay(new Date())
+            }
+        },
         orderBy: { timestamp: 'desc' }
     });
     return statusMessage ? statusMessage.content : 'pending';
 }
+
+
+// Get all remarks for a user excluding those with type 'status'
+async function getRemarksForDayRoom(callbackData, day) {
+    try {
+        const messages = await prisma.message.findMany({
+            where: {
+                callbackData: callbackData,
+                timestamp: {
+                    gte: startOfDay(day),
+                    lt: endOfDay(day)
+                }
+            },
+            orderBy: { timestamp: 'asc' },
+            include: {
+                user: true,
+            },
+        });
+        return messages;
+    } catch (error) {
+        console.error("Error getting messages for user:", error);
+        throw error;
+    }
+}
+
+
+
 module.exports = {
     createUser,
     getUser,
@@ -123,5 +174,6 @@ module.exports = {
     getMessageStatusGoodCountForRoom,
     getMessagesForRoom,
     saveRoomStatus,
-    getRoomStatus
+    getRoomStatus,
+    getRemarksForDayRoom
 };

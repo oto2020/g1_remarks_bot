@@ -18,13 +18,13 @@ const STATUS_ROOM_COMMENTED = '✍️';       // 100%
 
 
 // ГЕНЕРАЦИЯ ГЛАВНОГО МЕНЮ ПОДРАЗДЕЛЕНИЙ
-const generateMainMenu = async () => {
-    // Количество сообщений по всем помещениям департамента
-    const getMessageCountForDepartment = async (departmentKey) => {
-        const department = rooms[departmentKey];
+async function sendMainMenu(bot, chatId, currentDay, userName) {
+    let counter = 0;
+    const buttons = await Promise.all(Object.keys(rooms).map(async key => {
+        // Количество сообщений по всем помещениям департамента
+        let department = rooms[key];
         let totalMessages = 0;
         let roomsWithComments = 0;
-
         for (const room of department.rooms) {
             const count = await db.getMessageCountForRoom(room.callback_data) || await db.getMessageStatusGoodCountForRoom(room.callback_data);
             totalMessages += count;
@@ -32,12 +32,8 @@ const generateMainMenu = async () => {
                 roomsWithComments += 1;
             }
         }
-        return { totalMessages, roomsWithComments, totalRooms: department.rooms.length };
-    };
+        let totalRooms = department.rooms.length;
 
-    let counter = 0;
-    const buttons = await Promise.all(Object.keys(rooms).map(async key => {
-        const { totalMessages, roomsWithComments, totalRooms } = await getMessageCountForDepartment(key);
         let check = STATUS_DEPARTMENT_EMPTY;
         if (roomsWithComments == totalRooms) {
             check = STATUS_DEPARTMENT_FULL;
@@ -58,20 +54,18 @@ const generateMainMenu = async () => {
             ]
         );
     }
-    return {
+    let inlineKeyBoard = {
         reply_markup: {
             inline_keyboard: buttons
         }
     };
-};
-async function sendMainMenu(bot, chatId) {
-    await bot.sendMessage(chatId, 'Выберите отдел:', await generateMainMenu());
+    await bot.sendMessage(chatId, `Обход ${currentDay} ${userName}\nВыберите отдел:`, inlineKeyBoard);
 }
 
 
-// ГЕНЕРАЦИЯ ВТОРОГО МЕНЮ ПОМЕЩЕНИЙ, 
-const generateRoomMenu = async (department) => {
-    const buttons = await Promise.all(rooms[department].rooms.map(async room => {
+// ГЕНЕРАЦИЯ ВТОРОГО МЕНЮ ПОМЕЩЕНИЙ
+async function sendRoomMenu(bot, chatId, departmentKey) {
+    const buttons = await Promise.all(rooms[departmentKey].rooms.map(async room => {
         const count = await db.getMessageCountForRoom(room.callback_data);
         const status = await db.getRoomStatus(room.callback_data);
         let prependText = '';
@@ -86,15 +80,32 @@ const generateRoomMenu = async (department) => {
         return [{ text: `${prependText} ${room.name} ${appendText}`, callback_data: room.callback_data }];
     }));
     buttons.push([{ text: 'Назад к отделам', callback_data: 'back_to_departments' }]);
-    return {
+    let inlineKeyBoard = {
         reply_markup: {
             inline_keyboard: buttons
         }
     };
-};
-async function sendRoomMenu(bot, chatId, departmentKey) {
-    await bot.sendMessage(chatId, `Вы вернулись к отделу: \n📍${rooms[departmentKey].title}`, await generateRoomMenu(departmentKey));
+    await bot.sendMessage(chatId, `Вы вернулись к отделу: \n📍${rooms[departmentKey].title}`, inlineKeyBoard);
 }
+
+
+
+const getRoomByCallbackData = (callbackData) => {
+    for (const departmentKey in rooms) {
+        const department = rooms[departmentKey];
+        const room = department.rooms.find(room => room.callback_data === callbackData);
+        if (room) {
+            return {
+                departmentKey,
+                departmentTitle: department.title,
+                roomName: room.name,
+                roomIntermediateMessage: room.intermediate_message,
+                roomCallbackData: room.callback_data
+            };
+        }
+    }
+    return null;
+};
 
 
 // Function to send all messages of a room to the user
@@ -107,7 +118,6 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
         firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         console.log(firstTimestamp, lastTimestamp);
-        await bot.sendMessage(chatId, `🤖 Ранее вы писали:`);
     } else {
         // await bot.sendMessage(chatId, `🤖 Сообщения по помещению ${room.departmentTitle} "${room.roomName}" отсутствуют. Пожалуйста, сделайте фото и оставьте комментарий.`);
     }
@@ -118,10 +128,11 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
 
     for (let i = 0; i < messages.length; i++) {
         let message = messages[i];
+        let room = getRoomByCallbackData(message.callbackData);
         const date = new Date(message.timestamp);
         const minutes = date.getMinutes().toString().padStart(2, '0');
         const hours = date.getHours().toString().padStart(2, '0');
-        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n` + message.text;
+        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n\n` + message.text + `\n\n📍${room.departmentTitle} \n➡️ ${room.roomName} `;
         if (message.type === 'text') {
             if (lastTextMessage !== null) {
                 await bot.sendMessage(chatId, lastTextMessage);

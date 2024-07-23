@@ -43,6 +43,9 @@ async function registrationMiddleware(chatId) {
     // смотрим на наличие в БД
     let user = await db.getUser(chatId);
     if (user) {
+        userStatuses.get(chatId).name = user.name;
+        userStatuses.get(chatId).phoneNumber = user.phoneNumber;
+        userStatuses.get(chatId).position = user.position;
         userStatuses.get(chatId).step = STEPS.COMPLETED;
         return true;
     }
@@ -55,7 +58,7 @@ async function registrationMiddleware(chatId) {
             return false;
         }
         if (userStatuses.get(chatId).step === STEPS.NAME) {
-            bot.sendMessage(chatId, `🤖 Ваше имя:`); 
+            bot.sendMessage(chatId, `🤖 Ваша фамилия и имя:`); 
             // Обработчик полученного сообщения расположен в bot.on('message'
             return false;
         }
@@ -75,7 +78,10 @@ async function registrationMiddleware(chatId) {
             });
             let user = await db.getUser(chatId);
             bot.sendMessage(chatId, `🤖 Благодарим за регистрацию, ${user.position} ${user.name}, ${user.phoneNumber}`);
-            tg.sendMainMenu(bot, chatId);
+            bot.sendMessage(groupId, `🤖 Зарегистрирован пользователь!\nИмя: ${user.name}\nДолжность: ${user.position}\nТелефон: ${user.phoneNumber}`);
+            let currentDay = getCurrentDateFormatted();
+            let userName = userStatuses.get(chatId).name;
+            await tg.sendMainMenu(bot, chatId, currentDay, userName);
             return true;
         }
     }
@@ -87,6 +93,16 @@ const rooms = JSON.parse(fs.readFileSync('rooms.json', 'utf8'));
 
 const STATUS_ROOM_GOOD = '👍';
 const STATUS_ROOM_COMMENTED = '✍️';
+
+function getCurrentDateFormatted() {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    console.log(`${year}-${month}-${day}`);
+    return `${year}-${month}-${day}`;
+}
+
 
 const getRoomByCallbackData = (callbackData) => {
     for (const departmentKey in rooms) {
@@ -120,7 +136,9 @@ const sendBackButton = (departmentKey) => ({
 const handleMessage = async (msg) => {
     const callbackData = userStatuses.get(msg.chat.id).room;
     if (callbackData === 'none') {
-        await tg.sendMainMenu(bot, msg.chat.id);
+        let currentDay = getCurrentDateFormatted();
+        let userName = userStatuses.get(msg.chat.id).name;
+        await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
         return;
     }
 
@@ -168,6 +186,7 @@ const handleCallbackQuery = async (callbackQuery) => {
         const room = getRoomByCallbackData(roomCallbackData);
 
         const messages = await db.getMessagesForRoom(roomCallbackData);
+        await bot.sendMessage(msg.chat.id, `🤖 Комментарии открыты. Ранее вы писали:`);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
 
         bot.sendMessage(
@@ -179,9 +198,44 @@ const handleCallbackQuery = async (callbackQuery) => {
     }
 
     if (data === 'back_to_departments') {
-        await tg.sendMainMenu(bot, msg.chat.id);
+        let currentDay = getCurrentDateFormatted();
+        let userName = userStatuses.get(msg.chat.id).name;
+        await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
         // userStatus changing
         userStatuses.get(callbackQuery.from.id).room = 'none';
+        return;
+    }
+
+    if (data === 'SEND_TO_GROUP') {
+        let currentDay = getCurrentDateFormatted();
+        let userName = userStatuses.get(msg.chat.id).name;
+        console.log(`${userName} инициировал завершение обхода ${currentDay}`);
+        
+        await bot.sendMessage(msg.chat.id, `🤖 Выгружаю результат обхода в группу, ожидайте завершения.`);
+        await bot.sendMessage(groupId, `🤖 ВЫГРУЖАЮ РЕЗУЛЬТАТ ОБХОДА`);
+        let roomsCount = 0;
+        let messagesCount = 0;
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+        for (let section in rooms) {
+            for (let room of rooms[section].rooms) {
+                let roomCallbackData = room.callback_data;
+                let msgs = await db.getRemarksForDayRoom(roomCallbackData, currentDay);
+                if (msgs.length > 0 && !msgs.some(msg=>msg.type==='status' && msg.content==='good')) {
+                    roomsCount ++;
+                    messagesCount+=msgs.length;
+                    console.log(msgs);
+                    await tg.sendMessagesForRoom(bot, groupId, msgs);
+                    await delay(5000); // Добавляем задержку в 1 секунду между отправками сообщений
+                }
+            }
+        }
+        let finalText = `Всего ${messagesCount} замечаний в ${roomsCount} помещениях.`;
+        await bot.sendMessage(msg.chat.id, `🤖 Результат обхода отправлен!\n${finalText}`);
+        await bot.sendMessage(groupId, `🤖 ОБХОД ЗАВЕРШЕН!\n${finalText}`);
+        console.log(finalText);
+        // await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
+        // // userStatus changing
+        // userStatuses.get(callbackQuery.from.id).room = 'none';
         return;
     }
 
@@ -217,6 +271,7 @@ const handleRoomSelection = async (callbackQuery, data, room, department) => {
 ;
     if (status !== 'good') {
         const messages = await db.getMessagesForRoom(data);
+        await bot.sendMessage(msg.chat.id, `🤖 Ранее вы писали:`);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
     }
 
@@ -256,18 +311,21 @@ bot.on('contact', async (msg) => {
 
 // Команда /start
 bot.onText(/\/start/, async (msg) => {
+    if (msg.chat.type === 'group') return;
     console.log('start', msg.date);
     if(!await registrationMiddleware(msg.chat.id)) {
         console.log(`/start stopped by registrationMiddleware`);
         return;
     }
-    await tg.sendMainMenu(bot, msg.chat.id);
+    let currentDay = getCurrentDateFormatted();
+    let userName = userStatuses.get(msg.chat.id).name;
+    await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
 });
 
 // Получение сообщения
 bot.on('message', async (msg) => {
     // Этот обработчик не будет реагировать на сообщения с контактом и на сообщения от самого себя
-    if (msg.contact || msg.from.id === bot.id) {
+    if (msg.contact || msg.from.id === bot.id || msg.chat.type === 'group') {
         return;
     }
 
