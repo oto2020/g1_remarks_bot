@@ -110,16 +110,12 @@ const getRoomByCallbackData = (callbackData) => {
 
 // Function to send all messages of a room to the user
 const sendMessagesForRoom = async (bot, chatId, messages) => {
-
     let firstTimestamp = null;
     let lastTimestamp = null;
 
     if (messages.length > 0) {
         firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
         lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
-        console.log(firstTimestamp, lastTimestamp);
-    } else {
-        // await bot.sendMessage(chatId, `🤖 Сообщения по помещению ${room.departmentTitle} "${room.roomName}" отсутствуют. Пожалуйста, сделайте фото и оставьте комментарий.`);
     }
 
     let photoGroup = [];
@@ -132,43 +128,74 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
         const date = new Date(message.timestamp);
         const minutes = date.getMinutes().toString().padStart(2, '0');
         const hours = date.getHours().toString().padStart(2, '0');
-        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n\n` + message.text + `\n\n📍${room.departmentTitle} \n➡️ ${room.roomName} `;
-        if (message.type === 'text') {
-            if (lastTextMessage !== null) {
-                await bot.sendMessage(chatId, lastTextMessage);
+        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n\n${message.text}\n\n📍${room.departmentTitle}\n➡️ ${room.roomName}`;
 
-                lastTextMessage = null;
+        try {
+            if (message.type === 'text') {
+                if (lastTextMessage !== null) {
+                    await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage));
+                    lastTextMessage = null;
+                }
+                if (photoGroup.length > 0) {
+                    await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
+                    photoGroup = [];
+                    currentCaption = '';
+                }
+                lastTextMessage = `${messageText}`;
             }
-            if (photoGroup.length > 0) {
-                await bot.sendMediaGroup(chatId, photoGroup);
-                photoGroup = [];
-                currentCaption = '';
-            }
-            lastTextMessage = `${messageText}`;
-        }
 
-        if (message.type === 'photo') {
-            if (photoGroup.length > 0 && message.text && message.text !== currentCaption) {
-                await bot.sendMediaGroup(chatId, photoGroup);
-                photoGroup = [];
-                currentCaption = '';
+            if (message.type === 'photo') {
+                if (photoGroup.length > 0 && message.text && message.text !== currentCaption) {
+                    await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
+                    photoGroup = [];
+                    currentCaption = '';
+                }
+                if (photoGroup.length === 0) {
+                    currentCaption = message.text ? `${messageText}` : '';
+                    photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
+                } else {
+                    photoGroup.push({ type: 'photo', media: message.content });
+                }
             }
-            if (photoGroup.length === 0) {
-                currentCaption = message.text ? `${messageText}` : '';
-                photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
-            } else {
-                photoGroup.push({ type: 'photo', media: message.content });
-            }
+        } catch (error) {
+            console.error('Error sending message:', error);
         }
     }
 
     if (lastTextMessage !== null) {
-        await bot.sendMessage(chatId, lastTextMessage);
+        await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage));
     }
     if (photoGroup.length > 0) {
-        await bot.sendMediaGroup(chatId, photoGroup);
+        await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
     }
 };
+
+// Helper function to send messages with retry on failure
+const sendWithRetry = async (sendFunction) => {
+    let attempt = 0;
+    const maxAttempts = 500;
+    let delay = 1000; // Start with 1 second
+
+    while (attempt < maxAttempts) {
+        try {
+            await sendFunction();
+            return;
+        } catch (error) {
+            if (error.code === 'ETELEGRAM' && error.response && error.response.body.error_code === 429) {
+                const retryAfter = error.response.body.parameters.retry_after;
+                console.warn(`Too many requests. Retrying after ${retryAfter || delay} seconds.`);
+                await new Promise(resolve => setTimeout(resolve, (retryAfter || delay) * 1000));
+            } else {
+                throw error; // Re-throw non-rate limit errors
+            }
+        }
+        attempt++;
+        delay *= 2; // Exponential backoff
+    }
+
+    throw new Error('Max retry attempts reached. Could not send message.');
+};
+
 
 async function sendContactRequest (bot, chatId) {
     await bot.sendMessage(chatId, '🤖 Пожалуйста, поделитесь своим контактом для продолжения.', {
