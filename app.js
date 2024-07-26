@@ -299,7 +299,12 @@ bot.on('contact', async (msg) => {
     userStatusInit(chatId);
     const contact = msg.contact;
     if (contact) {
-        bot.sendMessage(chatId, `Спасибо за предоставление вашего контакта: ${contact.phone_number}`);
+        // Отправка сообщения и удаление клавиатуры
+        await bot.sendMessage(chatId, `Спасибо за ваш контакт! ${contact.phone_number}`, {
+            reply_markup: {
+                remove_keyboard: true
+            }
+        });
         userStatuses.get(chatId).phoneNumber = contact.phone_number;
         userStatuses.get(chatId).step = STEPS.NAME; // следущий этап
         // продолдение со следующего этапа
