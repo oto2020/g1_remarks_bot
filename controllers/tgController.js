@@ -108,8 +108,8 @@ const getRoomByCallbackData = (callbackData) => {
 };
 
 
-// Function to send all messages of a room to the user
 const sendMessagesForRoom = async (bot, chatId, messages) => {
+    let appendTextMessage = ""; // Define the append text here
     let firstTimestamp = null;
     let lastTimestamp = null;
 
@@ -128,12 +128,13 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
         const date = new Date(message.timestamp);
         const minutes = date.getMinutes().toString().padStart(2, '0');
         const hours = date.getHours().toString().padStart(2, '0');
-        let messageText = `👤 ${message.user.name} (${hours}:${minutes})\n\n${message.text}\n\n📍${room.departmentTitle}\n➡️ ${room.roomName}`;
+        let messageText = `${message.text}\n`;
+        appendTextMessage = `👤 ${message.user.name} (${hours}:${minutes})\n\n📍${room.departmentTitle}\n➡️ ${room.roomName}`;
 
         try {
             if (message.type === 'text') {
                 if (lastTextMessage !== null) {
-                    await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage));
+                    await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage + "\n" + appendTextMessage));
                     lastTextMessage = null;
                 }
                 if (photoGroup.length > 0) {
@@ -151,7 +152,7 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
                     currentCaption = '';
                 }
                 if (photoGroup.length === 0) {
-                    currentCaption = message.text ? `${messageText}` : '';
+                    currentCaption = (message.text ? `${messageText}` : '') + "\n" + appendTextMessage;
                     photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
                 } else {
                     photoGroup.push({ type: 'photo', media: message.content });
@@ -163,12 +164,13 @@ const sendMessagesForRoom = async (bot, chatId, messages) => {
     }
 
     if (lastTextMessage !== null) {
-        await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage));
+        await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage + "\n" + appendTextMessage));
     }
     if (photoGroup.length > 0) {
         await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
     }
 };
+
 
 // Helper function to send messages with retry on failure
 const sendWithRetry = async (sendFunction) => {
