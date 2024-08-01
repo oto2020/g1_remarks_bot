@@ -186,7 +186,7 @@ const handleCallbackQuery = async (callbackQuery) => {
         const room = getRoomByCallbackData(roomCallbackData);
 
         const messages = await db.getMessagesForRoom(roomCallbackData);
-        await bot.sendMessage(msg.chat.id, `🤖 Комментарии открыты. Ранее вы писали:`);
+        await bot.sendMessage(msg.chat.id, `🤖 Комментарии открыты. Ранее писали:`);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
 
         bot.sendMessage(
@@ -271,7 +271,7 @@ const handleRoomSelection = async (callbackQuery, data, room, department) => {
 ;
     if (status !== 'good') {
         const messages = await db.getMessagesForRoom(data);
-        await bot.sendMessage(msg.chat.id, `🤖 Ранее вы писали:`);
+        await bot.sendMessage(msg.chat.id, `🤖 Ранее писали:`);
         await tg.sendMessagesForRoom(bot, msg.chat.id, messages);
     }
 
