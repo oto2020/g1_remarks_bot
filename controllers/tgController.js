@@ -110,44 +110,75 @@ const getRoomByCallbackData = (callbackData) => {
 
 
 const sendMessagesForRoom = async (bot, chatId, messages) => {
-    let allTextMessages = ""; // Общий текст сообщений
-    let photoGroup = []; // Группа фото для отправки
-    let room = getRoomByCallbackData(messages[0].callbackData);
-    const locationFooter = `📍 ${room.departmentTitle}\n➡️ ${room.roomName}`;
+    let appendTextMessage = ""; 
+    let firstTimestamp = null;
+    let lastTimestamp = null;
+
+    if (messages.length > 0) {
+        firstTimestamp = new Date(messages[0].timestamp).toISOString().slice(0, 19).replace('T', ' ');
+        lastTimestamp = new Date(messages[messages.length - 1].timestamp).toISOString().slice(0, 19).replace('T', ' ');
+    }
+
+    let photoGroup = [];
+    let currentCaption = '';
+    let lastTextMessage = null;
+    const separator = "\n-----------------------------\n";
 
     for (let i = 0; i < messages.length; i++) {
         let message = messages[i];
+        let room = getRoomByCallbackData(message.callbackData);
         const date = new Date(message.timestamp);
         const minutes = date.getMinutes().toString().padStart(2, '0');
         const hours = date.getHours().toString().padStart(2, '0');
+        let messageText = (message.text || '') + '\n';  // Убедитесь, что messageText не содержит 'null'
+        appendTextMessage = `👤 ${message.user.name} (${hours}:${minutes})\n\n📍${room.departmentTitle}\n➡️ ${room.roomName}`;
 
-        // Добавляем текст сообщения в общий текст
-        if (message.text) {
-            allTextMessages += `👤 ${message.text}\n✍️ ${message.user.name} (${hours}:${minutes})\n\n`;
-        }
-        
-        if (message.type === 'photo') {
-            // Добавляем фото в группу
-            photoGroup.push({ type: 'photo', media: message.content });
+        try {
+            if (message.type === 'text') {
+                if (lastTextMessage !== null) {
+                    await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage + "\n" + appendTextMessage + separator));
+                    lastTextMessage = null;
+                }
+                if (photoGroup.length > 0) {
+                    await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
+                    photoGroup = [];
+                    currentCaption = '';
+                }
+                lastTextMessage = `${messageText}`;
+            }
+
+            if (message.type === 'photo') {
+                if (message.text || appendTextMessage) { // Проверяем также наличие appendTextMessage
+                    currentCaption = `${messageText}${appendTextMessage ? `\n${appendTextMessage}` : ''}`;
+                    if (photoGroup.length > 0) {
+                        photoGroup.push({ type: 'photo', media: message.content, caption: currentCaption });
+                        await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
+                        photoGroup = [];
+                    } else {
+                        await sendWithRetry(() => bot.sendPhoto(chatId, message.content, { caption: currentCaption + separator }));
+                    }
+                    currentCaption = '';
+                } else {
+                    photoGroup.push({ type: 'photo', media: message.content });
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error sending message:', error);
         }
     }
 
-    // Добавляем подпись с расположением в конец общего текста
-    allTextMessages += locationFooter;
-
-    try {
-        // Проверяем, есть ли фотографии, и отправляем их с общей подписью
-        if (photoGroup.length > 0) {
-            photoGroup[0].caption = allTextMessages.trim(); // Добавляем общий текст к первой фотографии
-            await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup));
-        } else if (allTextMessages.length > 0) {
-            // Если фотографий нет, отправляем только текст
-            await sendWithRetry(() => bot.sendMessage(chatId, allTextMessages, { parse_mode: 'Markdown' }));
-        }
-    } catch (error) {
-        console.error('Error sending message:', error);
+    if (lastTextMessage !== null) {
+        await sendWithRetry(() => bot.sendMessage(chatId, lastTextMessage + "\n" + appendTextMessage + separator));
+    }
+    if (photoGroup.length > 0) {
+        await sendWithRetry(() => bot.sendMediaGroup(chatId, photoGroup, { caption: appendTextMessage + separator }));
     }
 };
+
+
+
+
 
 
 
