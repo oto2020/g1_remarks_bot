@@ -96,6 +96,7 @@ const STATUS_ROOM_COMMENTED = '✍️';
 
 function getCurrentDateFormatted() {
     const date = new Date();
+    date.setDate(date.getDate()); 
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -161,6 +162,38 @@ const handleMessage = async (msg) => {
     );
 };
 
+async function sendDayReport(chatId, currentDay) {
+    // currentDay = '2024-11-08';
+    let userName = userStatuses.get(chatId).name;
+    console.log(`${userName} инициировал завершение обхода ${currentDay}`);
+    
+    await bot.sendMessage(chatId, `🤖 Выгружаю результат обхода в группу, ожидайте завершения.`);
+    await bot.sendMessage(groupId, `🤖 ВЫГРУЖАЮ РЕЗУЛЬТАТ ОБХОДА ${currentDay}`);
+    let roomsCount = 0;
+    let messagesCount = 0;
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    for (let section in rooms) {
+        for (let room of rooms[section].rooms) {
+            let roomCallbackData = room.callback_data;
+            let msgs = await db.getRemarksForDayRoom(roomCallbackData, currentDay);
+            if (msgs.length > 0 && !msgs.some(msg=>msg.type==='status' && msg.content==='good')) {
+                roomsCount ++;
+                messagesCount+=msgs.length;
+                console.log(msgs);
+                await tg.sendMessagesForRoom(bot, groupId, msgs);
+                await delay(5000); // Добавляем задержку в 1 секунду между отправками сообщений
+            }
+        }
+    }
+    let finalText = `Всего ${messagesCount} замечаний в ${roomsCount} помещениях.`;
+    await bot.sendMessage(chatId, `🤖 Результат обхода отправлен!\n${finalText}`);
+    await bot.sendMessage(groupId, `🤖 ВЫГРУЗКА ОБХОДА ЗА ${currentDay} ЗАВЕРШЕНА!\n${finalText}`);
+    console.log(finalText);
+    // await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
+    // // userStatus changing
+    // userStatuses.get(callbackQuery.from.id).room = 'none';
+    return;
+}
 const handleCallbackQuery = async (callbackQuery) => {
     const msg = callbackQuery.message;
     const data = callbackQuery.data;
@@ -208,35 +241,7 @@ const handleCallbackQuery = async (callbackQuery) => {
 
     if (data === 'SEND_TO_GROUP') {
         let currentDay = getCurrentDateFormatted();
-        let userName = userStatuses.get(msg.chat.id).name;
-        console.log(`${userName} инициировал завершение обхода ${currentDay}`);
-        
-        await bot.sendMessage(msg.chat.id, `🤖 Выгружаю результат обхода в группу, ожидайте завершения.`);
-        await bot.sendMessage(groupId, `🤖 ВЫГРУЖАЮ РЕЗУЛЬТАТ ОБХОДА`);
-        let roomsCount = 0;
-        let messagesCount = 0;
-        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-        for (let section in rooms) {
-            for (let room of rooms[section].rooms) {
-                let roomCallbackData = room.callback_data;
-                let msgs = await db.getRemarksForDayRoom(roomCallbackData, currentDay);
-                if (msgs.length > 0 && !msgs.some(msg=>msg.type==='status' && msg.content==='good')) {
-                    roomsCount ++;
-                    messagesCount+=msgs.length;
-                    console.log(msgs);
-                    await tg.sendMessagesForRoom(bot, groupId, msgs);
-                    await delay(5000); // Добавляем задержку в 1 секунду между отправками сообщений
-                }
-            }
-        }
-        let finalText = `Всего ${messagesCount} замечаний в ${roomsCount} помещениях.`;
-        await bot.sendMessage(msg.chat.id, `🤖 Результат обхода отправлен!\n${finalText}`);
-        await bot.sendMessage(groupId, `🤖 ОБХОД ЗАВЕРШЕН!\n${finalText}`);
-        console.log(finalText);
-        // await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
-        // // userStatus changing
-        // userStatuses.get(callbackQuery.from.id).room = 'none';
-        return;
+        await sendDayReport(msg.chat.id, currentDay); // 2024-12-24
     }
 
     if (rooms[data]) {
@@ -325,6 +330,27 @@ bot.onText(/\/start/, async (msg) => {
     let currentDay = getCurrentDateFormatted();
     let userName = userStatuses.get(msg.chat.id).name;
     await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
+});
+
+bot.on("polling_error", console.log);
+// Команда /send
+bot.onText(/\/send/, async (msg) => {
+    if (msg.chat.type === 'group') return;
+    console.log('!!!!!!!!!!!!!!!!!!!!send', msg.text);
+    let dateString = msg.text.split(' ')[1].replace(/^(\d{2})\.(\d{2})\.(\d{4})$/, '$3-$2-$1');
+    console.log(`Преобразованная дата: '${dateString}'`);
+    await sendDayReport(msg.chat.id, dateString); // 2024-12-24
+
+
+
+
+    // if(!await registrationMiddleware(msg.chat.id)) {
+    //     console.log(`/start stopped by registrationMiddleware`);
+    //     return;
+    // }
+    // let currentDay = getCurrentDateFormatted();
+    // let userName = userStatuses.get(msg.chat.id).name;
+    // await tg.sendMainMenu(bot, msg.chat.id, currentDay, userName);
 });
 
 // Получение сообщения

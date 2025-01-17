@@ -10,12 +10,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^5.17.0",
+    "@prisma/client": "^6.2.1",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.5",
     "node-telegram-bot-api": "^0.66.0"
   },
   "devDependencies": {
-    "prisma": "^5.17.0"
+    "prisma": "^6.2.1"
   }
 }
