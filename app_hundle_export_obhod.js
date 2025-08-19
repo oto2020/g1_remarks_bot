@@ -6,7 +6,7 @@ const tg = require('./controllers/tgController');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Настройки
-const groupId = '-4263608042'; // ID группы, куда будут отправлены сообщения
+const groupId = process.env.GROUP_CHAT_ID; // ID группы, куда будут отправлены сообщения
 const specificDate = "2024-12-23"; // Дата, за которую выгружаем замечания в формате "YYYY-MM-DD"
 
 // Главная функция

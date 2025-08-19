@@ -9,7 +9,7 @@ const tg = require('./controllers/tgController');
 const token = process.env.TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
-const groupId = '-4263608042'; // Идентификатор группы
+const groupId = process.env.GROUP_CHAT_ID; // Идентификатор группы
 
 // Определение шагов регистрации
 const STEPS = {
